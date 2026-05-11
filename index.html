@@ -1046,30 +1046,37 @@ function renderSchedule() {
 }
 
 /* ============================================================
-   SCOREBOARD RENDERING
+   SCOREBOARD RENDERING (FINAL — MULTI‑DIGIT SAFE)
    ============================================================ */
 const scoreboardContainer = document.getElementById("scoreboard-container");
 const scoreboardSummary = document.getElementById("scoreboard-summary");
 
+/* Lightweight summary updater — safe to call anytime */
+function updateScoreboardSummary() {
+  let total = 0;
+  let scored = 0;
+
+  state.rounds.forEach(r => {
+    total += r.matches.length;
+    r.matches.forEach(m => {
+      const id = matchId(r.roundIndex, m.matchIndex);
+      const s = state.scores[id];
+      if (s && (s.a != null || s.b != null)) scored++;
+    });
+  });
+
+  scoreboardSummary.textContent = `${scored}/${total} matches have scores`;
+}
+
 function renderScoreboard() {
   scoreboardContainer.innerHTML = "";
+
   if (!state.rounds.length) {
     scoreboardSummary.textContent = "No schedule yet.";
     return;
   }
 
-  let totalMatches = 0;
-  let scoredMatches = 0;
-  state.rounds.forEach(r => {
-    totalMatches += r.matches.length;
-    r.matches.forEach(m => {
-      const id = matchId(r.roundIndex, m.matchIndex);
-      const s = state.scores[id];
-      if (s && (s.a != null || s.b != null)) scoredMatches++;
-    });
-  });
-
-  scoreboardSummary.textContent = `${scoredMatches}/${totalMatches} matches have scores`;
+  updateScoreboardSummary();
 
   state.rounds.forEach(round => {
     const card = document.createElement("div");
@@ -1078,9 +1085,11 @@ function renderScoreboard() {
 
     const header = document.createElement("div");
     header.className = "card-header";
+
     const title = document.createElement("div");
     title.className = "card-title";
     title.textContent = `Round ${round.roundIndex + 1}`;
+
     header.appendChild(title);
     card.appendChild(header);
 
@@ -1090,43 +1099,60 @@ function renderScoreboard() {
 
       const label = document.createElement("div");
       label.style.fontSize = "12px";
-      const pA = match.playersA.map(pid => state.players.find(p => p.id === pid)?.name || `P${pid + 1}`).join(" & ");
-      const pB = match.playersB.map(pid => state.players.find(p => p.id === pid)?.name || `P${pid + 1}`).join(" & ");
+
+      const pA = match.playersA
+        .map(pid => state.players.find(p => p.id === pid)?.name || `P${pid + 1}`)
+        .join(" & ");
+
+      const pB = match.playersB
+        .map(pid => state.players.find(p => p.id === pid)?.name || `P${pid + 1}`)
+        .join(" & ");
+
       label.textContent = `Ct ${match.court}: ${pA} vs ${pB}`;
 
+      /* Inputs — text mode for mobile stability */
       const inputA = document.createElement("input");
-      inputA.type = "number";
-      inputA.min = "0";
+      inputA.type = "text";
+      inputA.inputMode = "numeric";
+      inputA.pattern = "[0-9]*";
       inputA.className = "score-input";
 
       const inputB = document.createElement("input");
-      inputB.type = "number";
-      inputB.min = "0";
+      inputB.type = "text";
+      inputB.inputMode = "numeric";
+      inputB.pattern = "[0-9]*";
       inputB.className = "score-input";
 
       const id = matchId(round.roundIndex, match.matchIndex);
       const existing = state.scores[id];
+
       if (existing) {
         if (existing.a != null) inputA.value = existing.a;
         if (existing.b != null) inputB.value = existing.b;
       }
 
+      /* Input A handler — NO scoreboard re-render */
       inputA.addEventListener("input", () => {
+        inputA.value = inputA.value.replace(/[^0-9]/g, "");
         const a = inputA.value === "" ? null : parseInt(inputA.value, 10);
         const b = inputB.value === "" ? null : parseInt(inputB.value, 10);
+
         state.scores[id] = { a, b };
         saveState();
         renderStandings();
-        renderScoreboard(); // update summary
+        updateScoreboardSummary();
       });
 
+      /* Input B handler — NO scoreboard re-render */
       inputB.addEventListener("input", () => {
+        inputB.value = inputB.value.replace(/[^0-9]/g, "");
         const a = inputA.value === "" ? null : parseInt(inputA.value, 10);
         const b = inputB.value === "" ? null : parseInt(inputB.value, 10);
+
         state.scores[id] = { a, b };
         saveState();
         renderStandings();
-        renderScoreboard(); // update summary
+        updateScoreboardSummary();
       });
 
       row.appendChild(label);
@@ -1139,6 +1165,7 @@ function renderScoreboard() {
   });
 }
 
+/* Clear scores button */
 document.getElementById("btn-clear-scores").addEventListener("click", () => {
   if (!confirm("Clear all scores?")) return;
   state.scores = {};
@@ -1146,6 +1173,7 @@ document.getElementById("btn-clear-scores").addEventListener("click", () => {
   renderScoreboard();
   renderStandings();
 });
+
 
 /* ============================================================
    STANDINGS / STATS
