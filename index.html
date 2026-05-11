@@ -1098,7 +1098,7 @@ function renderScoreboard() {
       row.className = "score-row";
 
       const label = document.createElement("div");
-      label.style.fontSize = "12px";
+      label.style.fontSize = "14px";
 
       const pA = match.playersA
         .map(pid => state.players.find(p => p.id === pid)?.name || `P${pid + 1}`)
